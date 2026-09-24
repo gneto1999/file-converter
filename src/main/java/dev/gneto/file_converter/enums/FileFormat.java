@@ -1,16 +1,25 @@
 package dev.gneto.file_converter.enums;
 
+import java.util.Arrays;
+import java.util.Optional;
+
 public enum FileFormat {
     PDF("pdf"),
     DOCX("docx");
 
-    private final String format;
+    private final String extension;
 
-    FileFormat(String format) {
-        this.format = format;
+    FileFormat(String extension) {
+        this.extension = extension;
     }
 
-    public String getFormat() {
-        return format;
+    public String getExtension() {
+        return extension;
+    }
+
+    public static Optional<FileFormat> fromExtension(String extension) {
+        return Arrays.stream(values())
+                .filter(format -> format.extension.equalsIgnoreCase(extension))
+                .findFirst();
     }
 }
