@@ -6,7 +6,6 @@ import java.nio.file.Path;
 import java.util.UUID;
 
 public record StoredFile(
-    UUID id,
     String originalFileName,
     String storedFileName,
     FileFormat fileFormat,

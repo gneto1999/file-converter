@@ -1,6 +1,8 @@
 package dev.gneto.file_converter.services;
 
 import dev.gneto.file_converter.config.FileStorageConfig;
+import dev.gneto.file_converter.config.RabbitMqConfig;
+import dev.gneto.file_converter.dto.ConversionMessage;
 import dev.gneto.file_converter.dto.StoredFile;
 import dev.gneto.file_converter.dto.response.ConversionResponse;
 import dev.gneto.file_converter.enums.FileFormat;
@@ -11,7 +13,7 @@ import dev.gneto.file_converter.model.ConversionJob;
 import dev.gneto.file_converter.repository.ConversionJobRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.core.io.Resource;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -33,12 +35,15 @@ public class ConversionJobService {
 
     private final ConversionJobMapper mapper;
 
+    private final RabbitTemplate rabbitTemplate;
+
     private static final Logger logger = LoggerFactory.getLogger(ConversionJobService.class);
 
     public ConversionJobService(
             FileStorageConfig fileStorageConfig,
             ConversionJobRepository repository,
-            ConversionJobMapper mapper
+            ConversionJobMapper mapper,
+            RabbitTemplate rabbitTemplate
     ) {
         String inputDirName = fileStorageConfig.getInputDir();
         String outputDirName = fileStorageConfig.getOutputDir();
@@ -53,6 +58,8 @@ public class ConversionJobService {
         this.repository = repository;
 
         this.mapper = mapper;
+
+        this.rabbitTemplate = rabbitTemplate;
     }
 
     public ConversionResponse createConversion(MultipartFile file, String outputExtension) {
@@ -69,7 +76,11 @@ public class ConversionJobService {
 
         ConversionJob jobSaved = repository.save(conversionJob);
 
-        // Falta publicar mensagem no rabbitmq
+        logger.info("Sending message on queue.");
+        ConversionMessage conversionMessage = new ConversionMessage(conversionJob.getId());
+        logger.info("Message sent on queue.");
+
+        rabbitTemplate.convertAndSend(RabbitMqConfig.EXCHANGE, RabbitMqConfig.ROUTING_KEY, conversionMessage);
 
         return mapper.conversionJobToConversionResponse(jobSaved);
     }
@@ -80,9 +91,9 @@ public class ConversionJobService {
 
             FileFormat fileFormat = extractFileFormat(originalFilename);
 
-            UUID conversionId = UUID.randomUUID();
+            UUID randomId = UUID.randomUUID();
 
-            String storedFileName = conversionId + "." + fileFormat.getExtension();
+            String storedFileName = randomId + "." + fileFormat.getExtension();
 
             Path destinationFile = inputDir.resolve(storedFileName).normalize().toAbsolutePath();
 
@@ -98,7 +109,7 @@ public class ConversionJobService {
 
             logger.info("File stored.");
 
-            return new StoredFile(conversionId, originalFilename, storedFileName, fileFormat, destinationFile);
+            return new StoredFile(originalFilename, storedFileName, fileFormat, destinationFile);
         } catch (IOException e) {
             throw new FileStorageException("Could not store uploaded file.", e);
         }
