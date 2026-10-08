@@ -1,6 +1,5 @@
 package dev.gneto.file_converter.services;
 
-import dev.gneto.file_converter.config.FileStorageConfig;
 import dev.gneto.file_converter.config.RabbitMqConfig;
 import dev.gneto.file_converter.dto.ConversionMessage;
 import dev.gneto.file_converter.dto.StoredFile;
@@ -17,53 +16,32 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.Locale;
 import java.util.UUID;
 
 @Service
 public class ConversionJobService {
 
-    private final Path inputDir;
-    private final Path outputDir;
-
+    private final FileStorageService fileStorageService;
     private final ConversionJobRepository repository;
-
     private final ConversionJobMapper mapper;
-
     private final RabbitTemplate rabbitTemplate;
 
     private static final Logger logger = LoggerFactory.getLogger(ConversionJobService.class);
 
     public ConversionJobService(
-            FileStorageConfig fileStorageConfig,
+            FileStorageService fileStorageService,
             ConversionJobRepository repository,
             ConversionJobMapper mapper,
             RabbitTemplate rabbitTemplate
     ) {
-        String inputDirName = fileStorageConfig.getInputDir();
-        String outputDirName = fileStorageConfig.getOutputDir();
-
-        if(inputDirName == null || inputDirName.isBlank() && outputDirName == null || outputDirName.isBlank()){
-            throw new FileStorageException("File upload location cannot be empty.");
-        }
-
-        this.inputDir = Paths.get(inputDirName).toAbsolutePath().normalize();
-        this.outputDir = Paths.get(outputDirName).toAbsolutePath().normalize();
-
+        this.fileStorageService = fileStorageService;
         this.repository = repository;
-
         this.mapper = mapper;
-
         this.rabbitTemplate = rabbitTemplate;
     }
 
     public ConversionResponse createConversion(MultipartFile file, String outputExtension) {
-        StoredFile storedFile = store(file);
+        StoredFile storedFile = fileStorageService.store(file);
         FileFormat outputFormat = FileFormat.fromExtension(outputExtension)
                 .orElseThrow(() -> new FileStorageException("Unsupported file format: " + outputExtension + "."));
 
@@ -85,84 +63,10 @@ public class ConversionJobService {
         return mapper.conversionJobToConversionResponse(jobSaved);
     }
 
-    private StoredFile store(MultipartFile file) {
-        try {
-            String originalFilename = validateFile(file);
-
-            FileFormat fileFormat = extractFileFormat(originalFilename);
-
-            UUID randomId = UUID.randomUUID();
-
-            String storedFileName = randomId + "." + fileFormat.getExtension();
-
-            Path destinationFile = inputDir.resolve(storedFileName).normalize().toAbsolutePath();
-
-            if (!destinationFile.getParent().equals(inputDir)) {
-                throw new FileStorageException("Cannot store file outside input directory.");
-            }
-
-            logger.info("Saving file...");
-
-            try (InputStream inputStream = file.getInputStream()) {
-                Files.copy(inputStream, destinationFile);
-            }
-
-            logger.info("File stored.");
-
-            return new StoredFile(originalFilename, storedFileName, fileFormat, destinationFile);
-        } catch (IOException e) {
-            throw new FileStorageException("Could not store uploaded file.", e);
-        }
-    }
-
-    private FileFormat extractFileFormat(String filename) {
-        int index = filename.lastIndexOf('.');
-
-        if (index == -1 || index == filename.length() - 1) {
-            throw new FileStorageException("Unable to identify the file format.");
-        }
-
-        String extension = filename.substring(index + 1).toLowerCase(Locale.ROOT);
-
-        return FileFormat.fromExtension(extension)
-                .orElseThrow(() -> new FileStorageException("Unsupported file format: " + extension + "."));
-    }
-
-    private String validateFile(MultipartFile file) {
-        logger.info("Validating the file.");
-
-        if (file == null) {
-            throw new FileStorageException("Uploaded file cannot be null.");
-        }
-
-        if (file.isEmpty()) {
-            throw new FileStorageException("Uploaded file cannot be empty.");
-        }
-
-        String originalFilename = file.getOriginalFilename();
-
-        if (originalFilename == null || originalFilename.isBlank()) {
-            throw new FileStorageException("File name can not be empty.");
-        }
-
-        return originalFilename;
-    }
-
     public ConversionResponse conversionStatus(UUID id) {
         var conversionJob = repository.findByPublicId(id)
                 .orElseThrow(() -> new ConversionJobNotFoundException(""));
 
         return mapper.conversionJobToConversionResponse(conversionJob);
-    }
-
-    public void initStorage() {
-        try {
-            logger.info("Creating Directories.");
-
-            Files.createDirectories(this.inputDir);
-            Files.createDirectories(this.outputDir);
-        } catch (IOException e) {
-            throw new FileStorageException("Could not create the directory.", e);
-        }
     }
 }

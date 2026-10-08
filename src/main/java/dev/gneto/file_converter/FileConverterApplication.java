@@ -1,6 +1,6 @@
 package dev.gneto.file_converter;
 
-import dev.gneto.file_converter.services.ConversionJobService;
+import dev.gneto.file_converter.services.FileStorageService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -14,9 +14,9 @@ public class FileConverterApplication {
 	}
 
 	@Bean
-    CommandLineRunner init(ConversionJobService conversionJobService) {
+    CommandLineRunner init(FileStorageService fileStorageService) {
 		return (args) -> {
-			conversionJobService.initStorage();
+			fileStorageService.initStorage();
 		};
 	}
 }
