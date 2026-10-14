@@ -6,11 +6,14 @@ import dev.gneto.file_converter.enums.FileFormat;
 import dev.gneto.file_converter.exception.FileStorageException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -67,6 +70,22 @@ public class FileStorageService {
         }
     }
 
+    public Resource loadAsResource(String path) {
+        try {
+            Path filePath = Paths.get(path).toAbsolutePath().normalize();
+
+            Resource resource = new UrlResource(filePath.toUri());
+
+            if (resource.exists() || resource.isReadable()) {
+                return resource;
+            }
+
+            throw new FileStorageException("Could not load file as resource.");
+        } catch (MalformedURLException e) {
+            throw new FileStorageException("Could not load file as resource.", e);
+        }
+    }
+
     private FileFormat extractFileFormat(String filename) {
         int index = filename.lastIndexOf('.');
 
@@ -81,7 +100,7 @@ public class FileStorageService {
     }
 
     private String validateFile(MultipartFile file) {
-        logger.info("Validating the file.");
+        logger.info("Validating file.");
 
         if (file == null) {
             throw new FileStorageException("Uploaded file cannot be null.");
