@@ -68,14 +68,14 @@ public class ConversionJobService {
 
     public ConversionResponse conversionStatus(UUID id) {
         var conversionJob = repository.findByPublicId(id)
-                .orElseThrow(() -> new ConversionJobNotFoundException(""));
+                .orElseThrow(() -> new ConversionJobNotFoundException("Conversion job not found with ID: " + id));
 
         return mapper.conversionJobToConversionResponse(conversionJob);
     }
 
     public FileDownload downloadConversion(UUID id) {
         ConversionJob job = repository.findByPublicId(id)
-                .orElseThrow(() -> new ConversionJobNotFoundException("ConversionJob not found: " + id));
+                .orElseThrow(() -> new ConversionJobNotFoundException("Conversion job not found with ID: " + id));
 
         if (job.getStatus() != ConversionStatus.DONE) {
             throw new ConversionException("It is not possible to download the file because the conversion has not yet been completed.");

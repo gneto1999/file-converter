@@ -1,5 +1,6 @@
 package dev.gneto.file_converter.controller;
 
+import dev.gneto.file_converter.controller.docs.ConversionJobControllerDocs;
 import dev.gneto.file_converter.dto.FileDownload;
 import dev.gneto.file_converter.dto.response.ConversionResponse;
 import dev.gneto.file_converter.services.ConversionJobService;
@@ -19,7 +20,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping(value = "/api/v1/conversions")
-public class ConversionJobController {
+public class ConversionJobController implements ConversionJobControllerDocs {
 
     private final ConversionJobService service;
 
@@ -30,12 +31,13 @@ public class ConversionJobController {
     }
 
     @PostMapping(
-        consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
-        produces = MediaType.APPLICATION_JSON_VALUE
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE
     )
+    @Override
     public ResponseEntity<ConversionResponse> createConversion(
-        @RequestParam("file") MultipartFile file,
-        @RequestParam("outputExtension") String outputExtension
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("outputExtension") String outputExtension
     ) {
         return ResponseEntity
                 .status(HttpStatus.ACCEPTED)
@@ -43,17 +45,19 @@ public class ConversionJobController {
     }
 
     @GetMapping(
-        value = "/{id}",
-        produces = MediaType.APPLICATION_JSON_VALUE
+            value = "/{id}",
+            produces = MediaType.APPLICATION_JSON_VALUE
     )
+    @Override
     public ResponseEntity<ConversionResponse> conversionStatus(@PathVariable UUID id) {
         return ResponseEntity.ok(service.conversionStatus(id));
     }
 
     @GetMapping(
-        value = "/{id}/download",
-        produces = MediaType.APPLICATION_OCTET_STREAM_VALUE
+            value = "/{id}/download",
+            produces = MediaType.APPLICATION_OCTET_STREAM_VALUE
     )
+    @Override
     public ResponseEntity<Resource> downloadConversion(@PathVariable UUID id, HttpServletRequest request) {
         FileDownload downloadFile = service.downloadConversion(id);
         Resource resource = downloadFile.resource();

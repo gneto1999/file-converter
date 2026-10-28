@@ -9,5 +9,6 @@ import java.util.UUID;
 
 @Repository
 public interface ConversionJobRepository extends JpaRepository<ConversionJob, Long> {
+
     Optional<ConversionJob> findByPublicId(UUID publicId);
 }
