@@ -1,5 +1,8 @@
 cors:
   allowedOrigins: ${ALLOWED_ORIGINS}
+admin:
+  email: ${ADMIN_EMAIL}
+  password: ${ADMIN_PASSWORD}
 security:
   jwt:
     token:
