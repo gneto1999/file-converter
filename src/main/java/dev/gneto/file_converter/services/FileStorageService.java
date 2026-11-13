@@ -4,6 +4,7 @@ import dev.gneto.file_converter.config.FileStorageConfig;
 import dev.gneto.file_converter.dto.StoredFile;
 import dev.gneto.file_converter.enums.FileFormat;
 import dev.gneto.file_converter.exception.FileStorageException;
+import dev.gneto.file_converter.model.ConversionJob;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
@@ -32,7 +33,7 @@ public class FileStorageService {
         String inputDirName = fileStorageConfig.getInputDir();
         String outputDirName = fileStorageConfig.getOutputDir();
 
-        if(inputDirName == null || inputDirName.isBlank() && outputDirName == null || outputDirName.isBlank()){
+        if(inputDirName == null || inputDirName.isBlank() || outputDirName == null || outputDirName.isBlank()){
             throw new FileStorageException("File upload location cannot be empty.");
         }
 
@@ -56,15 +57,20 @@ public class FileStorageService {
                 throw new FileStorageException("Cannot store file outside input directory.");
             }
 
-            logger.info("Saving file...");
+            logger.info("Saving uploaded file: {}", storedFileName);
 
             try (InputStream inputStream = file.getInputStream()) {
                 Files.copy(inputStream, destinationFile);
             }
 
-            logger.info("File stored.");
+            logger.info("File stored successfully: {}", storedFileName);
 
-            return new StoredFile(originalFilename, storedFileName, fileFormat, destinationFile);
+            return new StoredFile(
+                    extractFileNameWithoutExtension(originalFilename),
+                    storedFileName, 
+                    fileFormat,
+                    destinationFile
+            );
         } catch (IOException e) {
             throw new FileStorageException("Could not store uploaded file.", e);
         }
@@ -76,7 +82,11 @@ public class FileStorageService {
 
             Resource resource = new UrlResource(filePath.toUri());
 
-            if (resource.exists() || resource.isReadable()) {
+            if (!filePath.getParent().equals(outputDir)) {
+                throw new FileStorageException("Cannot access files outside output directory.");
+            }
+
+            if (resource.exists() && resource.isReadable()) {
                 return resource;
             }
 
@@ -84,6 +94,26 @@ public class FileStorageService {
         } catch (MalformedURLException e) {
             throw new FileStorageException("Could not load file as resource.", e);
         }
+    }
+
+    public void delete(String path) {
+        try {
+            Path filePath = Paths.get(path).toAbsolutePath().normalize();
+
+            if (!filePath.getParent().equals(outputDir)) {
+                throw new FileStorageException("Cannot access files outside output directory.");
+            }
+
+            Files.deleteIfExists(filePath);
+        } catch (IOException e) {
+            throw new FileStorageException("Could not delete file.", e);
+        }
+    }
+
+    private String extractFileNameWithoutExtension(String fileName) {
+        int indice = fileName.lastIndexOf('.');
+
+        return indice > 0 ? fileName.substring(0, indice) : fileName;
     }
 
     private FileFormat extractFileFormat(String filename) {

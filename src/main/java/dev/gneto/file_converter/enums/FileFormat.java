@@ -6,7 +6,8 @@ import java.util.Optional;
 public enum FileFormat {
     PDF("pdf"),
     DOCX("docx"),
-    HTML("html");
+    HTML("html"),
+    TEXT("txt");
 
     private final String extension;
 

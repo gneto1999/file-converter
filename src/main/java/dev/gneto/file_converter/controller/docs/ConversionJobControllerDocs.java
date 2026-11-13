@@ -1,16 +1,28 @@
 package dev.gneto.file_converter.controller.docs;
 
 import dev.gneto.file_converter.dto.response.ConversionResponse;
+import dev.gneto.file_converter.model.User;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.core.io.Resource;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Tag(name = "Conversion Job Endpoints")
@@ -26,15 +38,14 @@ public interface ConversionJobControllerDocs {
                             responseCode = "202",
                             content = @Content(schema = @Schema(implementation = ConversionResponse.class))
                     ),
-                    @ApiResponse(description = "No Content", responseCode = "204", content = @Content),
+                    @ApiResponse(description = "Unauthorized", responseCode = "401", content = @Content),
                     @ApiResponse(description = "Bad Request", responseCode = "400", content = @Content),
                     @ApiResponse(description = "Forbidden", responseCode = "403", content = @Content),
-                    @ApiResponse(description = "Unauthorized", responseCode = "401", content = @Content),
                     @ApiResponse(description = "Not Found", responseCode = "404", content = @Content),
                     @ApiResponse(description = "Internal Server Error", responseCode = "500", content = @Content)
             }
     )
-    ResponseEntity<ConversionResponse> createConversion(MultipartFile file, String outputExtension);
+    ResponseEntity<ConversionResponse> createConversion(User authUser, MultipartFile file, String outputExtension);
 
     @Operation(
             summary = "Get conversion job status",
@@ -46,15 +57,14 @@ public interface ConversionJobControllerDocs {
                             responseCode = "200",
                             content = @Content(schema = @Schema(implementation = ConversionResponse.class))
                     ),
-                    @ApiResponse(description = "No Content", responseCode = "204", content = @Content),
                     @ApiResponse(description = "Bad Request", responseCode = "400", content = @Content),
-                    @ApiResponse(description = "Forbidden", responseCode = "403", content = @Content),
                     @ApiResponse(description = "Unauthorized", responseCode = "401", content = @Content),
+                    @ApiResponse(description = "Forbidden", responseCode = "403", content = @Content),
                     @ApiResponse(description = "Not Found", responseCode = "404", content = @Content),
                     @ApiResponse(description = "Internal Server Error", responseCode = "500", content = @Content)
             }
     )
-    ResponseEntity<ConversionResponse> conversionStatus(UUID id);
+    ResponseEntity<ConversionResponse> conversionStatus(User authUser, UUID id);
 
     @Operation(
             summary = "Download converted file",
@@ -69,7 +79,49 @@ public interface ConversionJobControllerDocs {
                                     schema = @Schema(type = "string", format = "binary")
                             )
                     ),
+                    @ApiResponse(description = "Bad Request", responseCode = "400", content = @Content),
+                    @ApiResponse(description = "Unauthorized", responseCode = "401", content = @Content),
+                    @ApiResponse(description = "Forbidden", responseCode = "403", content = @Content),
+                    @ApiResponse(description = "Not Found", responseCode = "404", content = @Content),
+                    @ApiResponse(description = "Internal Server Error", responseCode = "500", content = @Content)
+            }
+    )
+    ResponseEntity<Resource> downloadConversion(User authUser, UUID id, HttpServletRequest request);
+
+    @Operation(
+            summary = "Delete a conversion file",
+            description = """
+                Deletes an existing conversion file identified by its ID.
+                The operation permanently removes the conversion file.
+                """,
+            tags = {"Conversion Job Endpoints"},
+            responses = {
                     @ApiResponse(description = "No Content", responseCode = "204", content = @Content),
+                    @ApiResponse(description = "Bad Request", responseCode = "400", content = @Content),
+                    @ApiResponse(description = "Unauthorized", responseCode = "401", content = @Content),
+                    @ApiResponse(description = "Forbidden", responseCode = "403", content = @Content),
+                    @ApiResponse(description = "Not Found", responseCode = "404", content = @Content),
+                    @ApiResponse(description = "Internal Server Error", responseCode = "500", content = @Content)
+            }
+    )
+    ResponseEntity<ConversionResponse> deleteConversion(User authUser, UUID id);
+
+    @Operation(
+            summary = "Retrieve completed conversions",
+            description = """
+                Retrieves a paginated list of conversions successfully completed
+                by the authenticated user.
+
+                The results can be sorted using the direction parameter.
+                Pagination is controlled through the page and size parameters.
+                """,
+            tags = {"Conversion Job Endpoints"},
+            responses = {
+                    @ApiResponse(
+                            description = "Success",
+                            responseCode = "200",
+                            content = @Content(schema = @Schema(implementation = ConversionResponse.class))
+                    ),
                     @ApiResponse(description = "Bad Request", responseCode = "400", content = @Content),
                     @ApiResponse(description = "Forbidden", responseCode = "403", content = @Content),
                     @ApiResponse(description = "Unauthorized", responseCode = "401", content = @Content),
@@ -77,5 +129,40 @@ public interface ConversionJobControllerDocs {
                     @ApiResponse(description = "Internal Server Error", responseCode = "500", content = @Content)
             }
     )
-    ResponseEntity<Resource> downloadConversion(UUID id, HttpServletRequest request);
+    ResponseEntity<Page<ConversionResponse>> getCompletedConversions(User authUser, @ParameterObject Pageable pageable);
+
+    @Operation(
+            summary = "Retrieve supported conversion formats",
+            description = "Retrieves the list of supported source and target formats for file conversion.",
+            tags = {"Conversion Job Endpoints"},
+            responses = {
+                    @ApiResponse(
+                            description = "Success",
+                            responseCode = "200",
+                            content = @Content(
+                                    mediaType = "application/json",
+                                    schema = @Schema(
+                                            type = "object",
+                                            additionalProperties = Schema.AdditionalPropertiesValue.TRUE,
+                                            additionalPropertiesSchema = List.class
+                                    ),
+                                    examples = @ExampleObject(
+                                            value = """
+                                                {
+                                                  "pdf": ["docx", "txt"],
+                                                  "docx": ["pdf", "txt"],
+                                                  "txt": ["pdf", "docx"]
+                                                }
+                                            """
+                                    )
+                            )
+                    ),
+                    @ApiResponse(description = "Bad Request", responseCode = "400", content = @Content),
+                    @ApiResponse(description = "Forbidden", responseCode = "403", content = @Content),
+                    @ApiResponse(description = "Unauthorized", responseCode = "401", content = @Content),
+                    @ApiResponse(description = "Not Found", responseCode = "404", content = @Content),
+                    @ApiResponse(description = "Internal Server Error", responseCode = "500", content = @Content)
+            }
+    )
+    ResponseEntity<Map<String, List<String>>> getSupportedFormats();
 }

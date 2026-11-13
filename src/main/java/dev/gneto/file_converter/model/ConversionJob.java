@@ -7,7 +7,6 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.Generated;
 import org.hibernate.generator.EventType;
 
-import java.math.BigInteger;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -57,6 +56,10 @@ public class ConversionJob {
     @Column(name = "completed_at")
     private Instant completedAt;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
     public ConversionJob() {
     }
 
@@ -64,13 +67,15 @@ public class ConversionJob {
             String originalFileName,
             FileFormat inputFormat,
             FileFormat outputFormat,
-            String inputPath
+            String inputPath,
+            User user
     ) {
         this.originalFileName = originalFileName;
         this.inputFormat = inputFormat;
         this.outputFormat = outputFormat;
         this.status = ConversionStatus.PENDING;
         this.inputPath = inputPath;
+        this.user = user;
     }
 
     public Long getId() {
@@ -155,5 +160,9 @@ public class ConversionJob {
 
     public void setCompletedAt(Instant completedAt) {
         this.completedAt = completedAt;
+    }
+
+    public User getUser() {
+        return user;
     }
 }
